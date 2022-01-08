@@ -1,4 +1,4 @@
-import re
+import time
 from datetime import datetime
 
 import certifi
@@ -39,9 +39,9 @@ def scrapper():
 
     print("Zbieranie danych")
 
+    get_all_data(page_number_ko, job_sites[2], "ko")
     get_all_data(page_number_mo, job_sites[1], "mo")
     get_all_data(page_number_me, job_sites[0], "me")
-    get_all_data(page_number_ko, job_sites[2], "ko")
 
     print("Zakończono zbierać danych")
 
@@ -51,16 +51,6 @@ def import_data_to_mongo(data, collection):
 
 
 def get_all_data(number_of_pages, site, flag):
-    links = []
-    names = []
-    prices = []
-    screens = []
-    processors = []
-    rams = []
-    disks = []
-    graphics = []
-    specifications = {"links": [], "names": [], "prices": [], "screens": [], "processors": [], "rams": [],
-                      "disks": [], "graphics": [], "data": []}
     if flag == "me":
         print("Trwa Pobieranie informacji ze strony Media Expert")
         for number in range(1, number_of_pages + 1):
@@ -163,29 +153,33 @@ def get_all_data(number_of_pages, site, flag):
             page = BeautifulSoup(r.text, 'html.parser')
             laptops_containers = page.find_all('li', class_='product-entry2')[:-1]
             specifications = {"links": [], "names": [], "prices": [], "screens": [], "processors": [], "rams": [],
-                              "graphics": [], "data": []}
+                              "disks": [], "data": []}
             for container in laptops_containers:
-                if (container.find('div', class_='prices').span.span is not None):
-                    specifications["links"].append(container.find('div', class_='pe2-head').a.get('href'))
-                    specifications["names"].append(container.find('div', class_='pe2-head').a.text.strip())
-                    specifications["prices"].append(''.join(re.findall(r'(\d+)', container.find('div', class_='prices').span.span.text)))
-                    parameters = container.find('div', class_="inline-features").text.strip().split("|")
-                    specifications["screens"].append(parameters[1])
-                    specifications["processors"].append(parameters[0])
-                    specifications["rams"].append(parameters[2])
-                    specifications["disks"].append(parameters[3])
+                specifications["links"].append(container.find('div', class_='pe2-head').a.get('href'))
+                specifications["names"].append(container.find('div', class_='pe2-head').a.text.strip())
+                specifications["prices"].append(int(
+                    container.find('span', attrs={'class': "proper"}).text.strip().split("z")[0].encode("ascii",
+                                                                                                        "ignore")))
+                parameters = container.find('div', class_="inline-features").text.strip().split("|")
+                specifications["screens"].append(parameters[1])
+                specifications["processors"].append(parameters[0])
+                specifications["rams"].append(parameters[2])
+                specifications["disks"].append(parameters[3])
+
             laptop_information = pd.DataFrame({
                 'links': specifications["links"],
                 'names': specifications["names"],
                 'prices': specifications["prices"],
                 'screens': specifications["screens"],
                 'rams': specifications["rams"],
-                "processors": specifications["processors"]
+                'processors': specifications["processors"],
+                'disks': specifications["disks"]
             })
-            import_data_to_mongo(laptop_information, db.komputronik)
+            if laptop_information.empty:
+                pass
+            else:
+                import_data_to_mongo(laptop_information, db.komputronik)
             print(f"Pobrano - {number} z {number_of_pages}\n")
-
-
 
         print("Zakończono")
     else:
