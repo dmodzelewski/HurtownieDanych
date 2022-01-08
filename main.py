@@ -1,4 +1,5 @@
 import re
+from datetime import datetime
 
 import certifi
 import pandas as pd
@@ -38,20 +39,18 @@ def scrapper():
 
     print("Zbieranie danych")
 
+    get_all_data(page_number_mo, job_sites[1], "mo")
     get_all_data(page_number_me, job_sites[0], "me")
     get_all_data(page_number_ko, job_sites[2], "ko")
-    get_all_data(page_number_mo, job_sites[1], "mo")
 
     print("Zakończono zbierać danych")
 
 
 def import_data_to_mongo(data, collection):
-    collection.insert_many(data.to_dict('records'))
+    collection.insert_many(data.to_dict("record"))
 
 
 def get_all_data(number_of_pages, site, flag):
-    specifications = {"links": [], "names": [], "prices": [], "screens": [], "processors": [], "rams": [], "disks": [],
-                     "graphics": [], }
     links = []
     names = []
     prices = []
@@ -60,17 +59,23 @@ def get_all_data(number_of_pages, site, flag):
     rams = []
     disks = []
     graphics = []
+    specifications = {"links": [], "names": [], "prices": [], "screens": [], "processors": [], "rams": [],
+                      "disks": [], "graphics": [], "data": []}
     if flag == "me":
         print("Trwa Pobieranie informacji ze strony Media Expert")
         for number in range(1, number_of_pages + 1):
             r = requests.get(site + f"&page={number}")
             page = BeautifulSoup(r.text, 'html.parser')
             laptops_containers = page.find_all('div', class_='offer-box')
+            data = datetime.today().strftime("%d-%m-%Y")
+            specifications = {"links": [], "names": [], "prices": [], "screens": [], "processors": [], "rams": [],
+                              "disks": [], "graphics": [], "data": []}
             for container in laptops_containers:
                 if container.find('div', class_='main-price is-big') is not None:
                     specifications["links"].append(f"https://www.mediaexpert.pl{container.h2.a.get('href')}")
                     specifications["names"].append(container.h2.a.text.strip())
-                    specifications["prices"].append(container.find('div', class_='main-price is-big').span.text.split("\\u"))
+                    specifications["prices"].append(
+                        int(container.find('div', class_='main-price is-big').span.text.encode('ascii', 'ignore')))
                     parameters = []
                     for param in container.find('table', class_='list attributes'):
                         for elem in param.find_all("span", class_='attribute-values is-regular'):
@@ -80,20 +85,24 @@ def get_all_data(number_of_pages, site, flag):
                         specifications["rams"].append(parameters[2])
                         specifications["disks"].append(parameters[3])
                         specifications["graphics"].append(parameters[4])
+            laptop_information = pd.DataFrame({
+                'links': specifications["links"],
+                'names': specifications["names"],
+                'prices': specifications["prices"],
+                'screens': specifications["screens"],
+                'rams': specifications["rams"],
+                'disks': specifications["disks"],
+                'graphics': specifications["graphics"],
+                "processors": specifications["processors"]
+            })
+
+            if laptop_information.empty:
+                pass
+            else:
+                import_data_to_mongo(laptop_information, db.media_expert)
 
             print(f"Pobrano - {number} z {number_of_pages}\n")
-        laptop_information = pd.DataFrame({
-            'links': links,
-            'names': names,
-            'prices': prices,
-            'screens': screens,
-            'rams': rams,
-            'disks': disks,
-            'graphics': graphics,
-            "processors": processors
-        })
 
-        import_data_to_mongo(laptop_information, db.media_expert)
         print("Zakończono")
     elif flag == "mo":
         print("Trwa pobieranie informacji ze strony Morele")
@@ -101,48 +110,50 @@ def get_all_data(number_of_pages, site, flag):
             r = requests.get(site + f",,,,,,,,0,,,,/{number}/")
             page = BeautifulSoup(r.text, 'html.parser')
             laptops_containers = page.find_all('div', class_='cat-product card')
+            specifications = {"links": [], "names": [], "prices": [], "screens": [], "processors": [], "rams": [],
+                              "graphics": [], "data": []}
             for container in laptops_containers:
                 if (container.find('div', class_='cat-product-price price-box') is not None) and (
                         container.div.p.a is not None):
 
-                    links.append(
+                    specifications["links"].append(
                         f"https://www.morele.net{container.find('a', class_='cat-product-image productLink').get('href')}")
-                    names.append(container.find('a', class_='cat-product-image productLink').get('title'))
-                    prices.append(container.find('div', class_='cat-product-price price-box').div.text.strip())
+                    specifications["names"].append(
+                        container.find('a', class_='cat-product-image productLink').get('title'))
+                    specifications["prices"].append(
+                        int(''.join(container.find('div', class_='price-new').text.split(" ")[:2]).split(',')[0]))
                     parameters = []
                     for param in container.find_all('div', class_='cat-product-feature'):
                         parameters.append(param.b.text)
 
                     try:
-                        screens.append(parameters[3])
+                        specifications["screens"].append(parameters[3])
                     except IndexError:
-                        screens.append("Brak")
+                        specifications["screens"].append("Brak")
                     try:
-                        processors.append(parameters[2])
+                        specifications["processors"].append(parameters[2])
                     except IndexError:
-                        processors.append("Brak")
+                        specifications["processors"].append("Brak")
                     try:
-                        rams.append(parameters[1])
+                        specifications["rams"].append(parameters[1])
                     except IndexError:
-                        rams.append("Brak")
+                        specifications["rams"].append("Brak")
                     try:
-                        graphics.append(parameters[0])
+                        specifications["graphics"].append(parameters[0])
                     except IndexError:
-                        graphics.append("Brak")
-
+                        specifications["graphics"].append("Brak")
+            laptop_information = pd.DataFrame({
+                'links': specifications["links"],
+                'names': specifications["names"],
+                'prices': specifications["prices"],
+                'screens': specifications["screens"],
+                'rams': specifications["rams"],
+                'graphics': specifications["graphics"],
+                "processors": specifications["processors"]
+            })
+            import_data_to_mongo(laptop_information, db.morele)
             print(f"Pobrano - {number} z {number_of_pages}\n")
-        laptop_information = pd.DataFrame({
-            'links': links,
-            'names': names,
-            'prices': prices,
-            'screens': screens,
-            'rams': rams,
-            'graphics': graphics,
-            "processors": processors
 
-        })
-
-        import_data_to_mongo(laptop_information, db.morele)
         print("Zakończono")
 
     elif flag == "ko":
@@ -151,28 +162,31 @@ def get_all_data(number_of_pages, site, flag):
             r = requests.get(site + f"&p{number}")
             page = BeautifulSoup(r.text, 'html.parser')
             laptops_containers = page.find_all('li', class_='product-entry2')[:-1]
+            specifications = {"links": [], "names": [], "prices": [], "screens": [], "processors": [], "rams": [],
+                              "graphics": [], "data": []}
             for container in laptops_containers:
                 if (container.find('div', class_='prices').span.span is not None):
-                    links.append(container.find('div', class_='pe2-head').a.get('href'))
-                    names.append(container.find('div', class_='pe2-head').a.text.strip())
-                    prices.append(''.join(re.findall(r'(\d+)', container.find('div', class_='prices').span.span.text)))
+                    specifications["links"].append(container.find('div', class_='pe2-head').a.get('href'))
+                    specifications["names"].append(container.find('div', class_='pe2-head').a.text.strip())
+                    specifications["prices"].append(''.join(re.findall(r'(\d+)', container.find('div', class_='prices').span.span.text)))
                     parameters = container.find('div', class_="inline-features").text.strip().split("|")
-                    screens.append(parameters[1])
-                    processors.append(parameters[0])
-                    rams.append(parameters[2])
-                    disks.append(parameters[3])
+                    specifications["screens"].append(parameters[1])
+                    specifications["processors"].append(parameters[0])
+                    specifications["rams"].append(parameters[2])
+                    specifications["disks"].append(parameters[3])
+            laptop_information = pd.DataFrame({
+                'links': specifications["links"],
+                'names': specifications["names"],
+                'prices': specifications["prices"],
+                'screens': specifications["screens"],
+                'rams': specifications["rams"],
+                "processors": specifications["processors"]
+            })
+            import_data_to_mongo(laptop_information, db.komputronik)
             print(f"Pobrano - {number} z {number_of_pages}\n")
-        laptop_information = pd.DataFrame({
-            'links': links,
-            'names': names,
-            'prices': prices,
-            'screens': screens,
-            'rams': rams,
-            "processors": processors
 
-        })
 
-        import_data_to_mongo(laptop_information, db.komputronik)
+
         print("Zakończono")
     else:
         print("Błąd")
