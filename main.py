@@ -1,4 +1,3 @@
-import time
 from datetime import datetime
 
 import certifi
@@ -75,6 +74,7 @@ def get_all_data(number_of_pages, site, flag):
                         specifications["rams"].append(parameters[2])
                         specifications["disks"].append(parameters[3])
                         specifications["graphics"].append(parameters[4])
+                        specifications["data"].append(data)
             laptop_information = pd.DataFrame({
                 'links': specifications["links"],
                 'names': specifications["names"],
@@ -83,7 +83,8 @@ def get_all_data(number_of_pages, site, flag):
                 'rams': specifications["rams"],
                 'disks': specifications["disks"],
                 'graphics': specifications["graphics"],
-                "processors": specifications["processors"]
+                "processors": specifications["processors"],
+                "data": specifications["data"]
             })
 
             if laptop_information.empty:
@@ -102,6 +103,7 @@ def get_all_data(number_of_pages, site, flag):
             laptops_containers = page.find_all('div', class_='cat-product card')
             specifications = {"links": [], "names": [], "prices": [], "screens": [], "processors": [], "rams": [],
                               "graphics": [], "data": []}
+            data = datetime.today().strftime("%d-%m-%Y")
             for container in laptops_containers:
                 if (container.find('div', class_='cat-product-price price-box') is not None) and (
                         container.div.p.a is not None):
@@ -132,6 +134,7 @@ def get_all_data(number_of_pages, site, flag):
                         specifications["graphics"].append(parameters[0])
                     except IndexError:
                         specifications["graphics"].append("Brak")
+                    specifications["data"].append(data)
             laptop_information = pd.DataFrame({
                 'links': specifications["links"],
                 'names': specifications["names"],
@@ -139,7 +142,8 @@ def get_all_data(number_of_pages, site, flag):
                 'screens': specifications["screens"],
                 'rams': specifications["rams"],
                 'graphics': specifications["graphics"],
-                "processors": specifications["processors"]
+                "processors": specifications["processors"],
+                "data": specifications["data"]
             })
             import_data_to_mongo(laptop_information, db.morele)
             print(f"Pobrano - {number} z {number_of_pages}\n")
@@ -154,6 +158,7 @@ def get_all_data(number_of_pages, site, flag):
             laptops_containers = page.find_all('li', class_='product-entry2')[:-1]
             specifications = {"links": [], "names": [], "prices": [], "screens": [], "processors": [], "rams": [],
                               "disks": [], "data": []}
+            data = datetime.today().strftime("%d-%m-%Y")
             for container in laptops_containers:
                 specifications["links"].append(container.find('div', class_='pe2-head').a.get('href'))
                 specifications["names"].append(container.find('div', class_='pe2-head').a.text.strip())
@@ -165,6 +170,7 @@ def get_all_data(number_of_pages, site, flag):
                 specifications["processors"].append(parameters[0])
                 specifications["rams"].append(parameters[2])
                 specifications["disks"].append(parameters[3])
+                specifications["data"].append(data)
 
             laptop_information = pd.DataFrame({
                 'links': specifications["links"],
@@ -173,7 +179,8 @@ def get_all_data(number_of_pages, site, flag):
                 'screens': specifications["screens"],
                 'rams': specifications["rams"],
                 'processors': specifications["processors"],
-                'disks': specifications["disks"]
+                'disks': specifications["disks"],
+                'data': specifications["data"]
             })
             if laptop_information.empty:
                 pass
